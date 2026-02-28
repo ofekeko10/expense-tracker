@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מעקב הוצאות חודשיות</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<!-- Supabase JS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131c;
+  --surface2: #1c1c2e;
+  --border: #2a2a40;
+  --accent: #6c63ff;
+  --accent-glow: rgba(108,99,255,0.25);
+  --text: #e8e8f0;
+  --muted: #7070a0;
+  --danger: #ff4757;
+  --success: #43e97b;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Heebo', sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh;
+  background-image: radial-gradient(ellipse at 20% 20%, #1a1040 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, #001a30 0%, transparent 50%);
+}
+
+/* ── AUTH SCREEN ── */
+#auth-screen {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.auth-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
+  padding: 2.5rem 2rem; width: 100%; max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.auth-logo { text-align: center; margin-bottom: 0.3rem; font-size: 2.2rem; font-weight: 900;
+  background: linear-gradient(135deg, #6c63ff, #00c6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.auth-sub { text-align: center; color: var(--muted); font-size: 0.85rem; margin-bottom: 2rem; }
+.auth-tabs { display: flex; background: var(--surface2); border-radius: 12px; padding: 4px; margin-bottom: 1.5rem; }
+.auth-tab { flex: 1; padding: 0.55rem; border: none; background: transparent; color: var(--muted);
+  font-family: 'Heebo', sans-serif; font-size: 0.9rem; border-radius: 9px; cursor: pointer; transition: all 0.2s; }
+.auth-tab.active { background: var(--accent); color: white; font-weight: 700; }
+.auth-field { margin-bottom: 1rem; }
+.auth-field label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+.auth-field input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 0.75rem 1rem; color: var(--text); font-family: 'Heebo', sans-serif; font-size: 0.9rem;
+  outline: none; transition: border-color 0.2s;
+}
+.auth-field input:focus { border-color: var(--accent); }
+.btn-primary {
+  width: 100%; padding: 0.85rem; background: linear-gradient(135deg, var(--accent), #a06cff);
+  border: none; border-radius: 12px; color: white; font-family: 'Heebo', sans-serif;
+  font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s, transform 0.1s; margin-top: 0.3rem;
+}
+.btn-primary:hover { opacity: 0.9; transform: scale(1.01); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.auth-error { background: rgba(255,71,87,0.12); border: 1px solid rgba(255,71,87,0.3);
+  border-radius: 10px; padding: 0.7rem 1rem; font-size: 0.85rem; color: #ff6b7a; margin-top: 0.8rem; display: none; }
+.auth-success { background: rgba(67,233,123,0.12); border: 1px solid rgba(67,233,123,0.3);
+  border-radius: 10px; padding: 0.7rem 1rem; font-size: 0.85rem; color: #43e97b; margin-top: 0.8rem; display: none; }
+
+/* ── APP SCREEN ── */
+#app-screen { display: none; padding: 2rem 1rem; }
+.app-header {
+  max-width: 900px; margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: space-between;
+}
+.app-title { font-size: 1.8rem; font-weight: 900;
+  background: linear-gradient(135deg, #6c63ff, #00c6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.user-info { display: flex; align-items: center; gap: 0.8rem; }
+.user-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #00c6ff);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
+}
+.user-email { font-size: 0.8rem; color: var(--muted); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-logout {
+  padding: 0.35rem 0.9rem; border-radius: 8px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted); font-family: 'Heebo', sans-serif;
+  font-size: 0.8rem; cursor: pointer; transition: all 0.2s;
+}
+.btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+/* ── MAIN APP ── */
+h1 { text-align: center; font-size: 2.5rem; font-weight: 900; margin-bottom: 0.3rem;
+  background: linear-gradient(135deg, #6c63ff, #00c6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.subtitle { text-align: center; color: var(--muted); margin-bottom: 2rem; font-size: 0.9rem; }
+.summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; max-width: 900px; margin: 0 auto 2rem; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem; text-align: center; transition: transform 0.2s, border-color 0.2s; }
+.card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.card-value { font-size: 1.8rem; font-weight: 900; background: linear-gradient(135deg, #6c63ff, #00c6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.card-label { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+.main-container { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; }
+@media (max-width: 700px) { .main-container { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 1.5rem; }
+.panel-title { font-size: 1rem; font-weight: 700; margin-bottom: 1.2rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+.form-group { margin-bottom: 1rem; position: relative; }
+label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; }
+input, select {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.7rem 1rem; color: var(--text);
+  font-family: 'Heebo', sans-serif; font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+}
+input:focus, select:focus { border-color: var(--accent); }
+select option { background: var(--surface2); }
+.amount-wrapper { position: relative; }
+.curr-prefix { position: absolute; right: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--accent); font-weight: 700; font-size: 1rem; pointer-events: none; z-index: 1; }
+.amount-wrapper input { padding-right: 2.2rem; }
+.autocomplete-list { position: absolute; top: 100%; right: 0; left: 0; z-index: 100; background: var(--surface2); border: 1px solid var(--accent); border-radius: 10px; overflow: hidden; margin-top: 2px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.autocomplete-item { padding: 0.6rem 1rem; cursor: pointer; display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; transition: background 0.15s; }
+.autocomplete-item:hover, .autocomplete-item.selected { background: rgba(108,99,255,0.2); }
+.autocomplete-cat { font-size: 0.7rem; color: var(--muted); margin-right: auto; }
+.auto-badge { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.8rem; border-radius: 8px;
+  background: rgba(108,99,255,0.15); border: 1px solid rgba(108,99,255,0.3);
+  font-size: 0.8rem; color: #a29bfe; margin-bottom: 0.8rem; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; } }
+.btn-add {
+  width: 100%; padding: 0.8rem; background: linear-gradient(135deg, var(--accent), #a06cff);
+  border: none; border-radius: 12px; color: white; font-family: 'Heebo', sans-serif;
+  font-weight: 700; font-size: 1rem; cursor: pointer; transition: opacity 0.2s, transform 0.1s;
+  margin-top: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn-add:hover { opacity: 0.9; transform: scale(1.02); }
+.btn-add:active { transform: scale(0.98); }
+.filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
+.filter-btn { padding: 0.35rem 0.9rem; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'Heebo', sans-serif; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+.filter-btn.active, .filter-btn:hover { background: var(--accent); border-color: var(--accent); color: white; }
+.expense-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.expense-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; padding: 0.9rem 1rem; display: flex; align-items: center; gap: 0.9rem; animation: slideIn 0.3s ease; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+.expense-icon { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+.expense-info { flex: 1; min-width: 0; }
+.expense-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.expense-meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+.expense-amount { font-weight: 900; font-size: 1rem; white-space: nowrap; }
+.expense-actions { display: flex; gap: 0.4rem; align-items: center; flex-shrink: 0; }
+.btn-icon { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-icon:hover { background: #ff4444; border-color: #ff4444; color: white; }
+.btn-manage-sub {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  margin-top: 0.35rem;
+  padding: 0.25rem 0.65rem; border-radius: 7px;
+  background: rgba(108,99,255,0.12); border: 1px solid rgba(108,99,255,0.3);
+  color: #a29bfe; font-size: 0.72rem; font-family: 'Heebo', sans-serif;
+  text-decoration: none; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+}
+.btn-manage-sub:hover { background: rgba(108,99,255,0.25); border-color: var(--accent); color: white; }
+.cat-badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600; }
+.cat-list { display: flex; flex-direction: column; gap: 0.8rem; }
+.cat-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.3rem; }
+.cat-name { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+.cat-amount { font-size: 0.85rem; font-weight: 700; }
+.progress-bar-bg { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+.empty-state { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.9rem; }
+.empty-state .icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.currency-toggle { display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 0.8rem; }
+.curr-btn { padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: 'Heebo', sans-serif; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; }
+.curr-btn.active { background: var(--surface2); border-color: var(--accent); color: var(--text); }
+.rate-info { text-align: center; font-size: 0.72rem; color: var(--muted); margin-bottom: 1.5rem; }
+.rate-info span { color: #a29bfe; }
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(162,155,254,0.3); border-top-color: #a29bfe; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+.spinner-lg { width: 32px; height: 32px; border-width: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* loading overlay */
+#loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 999; flex-direction: column; gap: 1rem; }
+#loading-overlay p { color: var(--muted); font-size: 0.9rem; }
+
+/* manage URL hint */
+.manage-hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+  <span class="spinner spinner-lg"></span>
+  <p>טוען...</p>
+</div>
+
+<!-- Auth Screen -->
+<div id="auth-screen" style="display:none">
+  <div class="auth-box">
+    <div class="auth-logo">💸 מעקב הוצאות</div>
+    <p class="auth-sub">ניהול מינויים ושירותים חודשיים</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">כניסה</button>
+      <button class="auth-tab" onclick="switchTab('signup')">הרשמה</button>
+    </div>
+
+    <div id="tab-login">
+      <div class="auth-field">
+        <label>אימייל</label>
+        <input type="email" id="login-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <div class="auth-field">
+        <label>סיסמה</label>
+        <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()">
+      </div>
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">כניסה למערכת</button>
+    </div>
+
+    <div id="tab-signup" style="display:none">
+      <div class="auth-field">
+        <label>אימייל</label>
+        <input type="email" id="signup-email" placeholder="your@email.com">
+      </div>
+      <div class="auth-field">
+        <label>סיסמה (לפחות 6 תווים)</label>
+        <input type="password" id="signup-password" placeholder="••••••••">
+      </div>
+      <div class="auth-field">
+        <label>אישור סיסמה</label>
+        <input type="password" id="signup-password2" placeholder="••••••••" onkeydown="if(event.key==='Enter') doSignup()">
+      </div>
+      <button class="btn-primary" id="btn-signup" onclick="doSignup()">יצירת חשבון</button>
+    </div>
+
+
+
+    <div id="auth-error" class="auth-error"></div>
+    <div id="auth-success" class="auth-success"></div>
+  </div>
+</div>
+
+<!-- App Screen -->
+<div id="app-screen" style="display:none">
+  <div class="app-header">
+    <div class="app-title">💸 מעקב הוצאות</div>
+    <div class="user-info">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div>
+        <div class="user-email" id="user-email-display"></div>
+        <div style="font-size:0.7rem;color:var(--muted)">מחובר</div>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">יציאה</button>
+    </div>
+  </div>
+
+  <div class="currency-toggle">
+    <button class="curr-btn active" onclick="setCurrency('ILS',this)">₪ שקל</button>
+    <button class="curr-btn" onclick="setCurrency('USD',this)">$ דולר</button>
+    <button class="curr-btn" onclick="setCurrency('EUR',this)">€ יורו</button>
+  </div>
+  <div class="rate-info" id="rate-info"><span class="spinner"></span> טוען שערי מטבע...</div>
+
+  <div class="summary-cards">
+    <div class="card"><div class="card-value" id="total-monthly">—</div><div class="card-label">סה"כ חודשי</div></div>
+    <div class="card"><div class="card-value" id="total-yearly">—</div><div class="card-label">סה"כ שנתי</div></div>
+    <div class="card"><div class="card-value" id="total-count">0</div><div class="card-label">מינויים פעילים</div></div>
+    <div class="card"><div class="card-value" id="top-category">—</div><div class="card-label">קטגוריה יקרה</div></div>
+  </div>
+
+  <div class="main-container">
+    <div>
+      <div class="panel" style="margin-bottom:1.5rem">
+        <div class="panel-title">➕ הוספת הוצאה</div>
+
+        <div class="form-group" id="autocomplete-wrapper">
+          <label>שם השירות</label>
+          <input type="text" id="inp-name" placeholder="למשל: Netflix, Spotify, AWS..."
+            autocomplete="off" oninput="onNameInput()" onkeydown="onNameKeydown(event)">
+          <div class="autocomplete-list" id="autocomplete-list" style="display:none"></div>
+        </div>
+
+        <div id="auto-detect-badge" style="display:none"></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+          <div class="form-group">
+            <label>סכום</label>
+            <div class="amount-wrapper">
+              <span class="curr-prefix" id="inp-curr-prefix">₪</span>
+              <input type="number" id="inp-amount" placeholder="0" min="0" step="0.01">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>תדירות</label>
+            <select id="inp-freq">
+              <option value="monthly">חודשי</option>
+              <option value="yearly">שנתי</option>
+              <option value="weekly">שבועי</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>קטגוריה <span style="color:var(--muted);font-size:0.75rem">(מזוהה אוטומטית)</span></label>
+          <select id="inp-cat">
+            <option value="streaming">🎬 סטרימינג ובידור</option>
+            <option value="music">🎵 מוזיקה ופודקאסטים</option>
+            <option value="cloud">☁️ שירותי ענן ואחסון</option>
+            <option value="software">💻 תוכנה וכלים</option>
+            <option value="gaming">🎮 גיימינג</option>
+            <option value="news">📰 חדשות ומדיה</option>
+            <option value="fitness">🏋️ כושר ובריאות</option>
+            <option value="food">🍕 משלוחי אוכל</option>
+            <option value="education">📚 חינוך ולמידה</option>
+            <option value="other">📦 אחר</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>הערה (אופציונלי)</label>
+          <input type="text" id="inp-note" placeholder="פרטים נוספים...">
+        </div>
+
+        <button class="btn-add" id="btn-add" onclick="addExpense()">+ הוסף הוצאה</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">📋 כל ההוצאות</div>
+        <div class="filter-bar" id="filter-bar">
+          <button class="filter-btn active" onclick="setFilter('all',this)">הכל</button>
+        </div>
+        <div class="expense-list" id="expense-list">
+          <div class="empty-state"><div class="icon">📭</div><div>טוען הוצאות...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-title">📊 פירוט לפי קטגוריה</div>
+        <div class="cat-list" id="cat-list">
+          <div class="empty-state"><div class="icon">📈</div><div>הוסף הוצאות לראות פירוט</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// ⚙️  SUPABASE CONFIG — החלף את הערכים הבאים!
+// ══════════════════════════════════════════════════════════
+const SUPABASE_URL  = 'https://rwprihpuwwsmbajsogdm.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cHJpaHB1d3dzbWJhanNvZ2RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODY0MjksImV4cCI6MjA4Nzg2MjQyOX0.SX40sER3520nW-K_ybXoYfpBk1ElYRixxXR0FxeLDfo';
+// ══════════════════════════════════════════════════════════
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── DATA ───────────────────────────────────────────────────
+const CATEGORIES = {
+  streaming: { label: 'סטרימינג ובידור', icon: '🎬', color: '#ff6584' },
+  music:     { label: 'מוזיקה ופודקאסטים', icon: '🎵', color: '#a29bfe' },
+  cloud:     { label: 'ענן ואחסון', icon: '☁️', color: '#00c6ff' },
+  software:  { label: 'תוכנה וכלים', icon: '💻', color: '#6c63ff' },
+  gaming:    { label: 'גיימינג', icon: '🎮', color: '#43e97b' },
+  news:      { label: 'חדשות ומדיה', icon: '📰', color: '#f7971e' },
+  fitness:   { label: 'כושר ובריאות', icon: '🏋️', color: '#fd79a8' },
+  food:      { label: 'משלוחי אוכל', icon: '🍕', color: '#e17055' },
+  education: { label: 'חינוך ולמידה', icon: '📚', color: '#fdcb6e' },
+  other:     { label: 'אחר', icon: '📦', color: '#b2bec3' },
+};
+
+const KNOWN_SERVICES = [
+  { name: 'Netflix', cat: 'streaming' }, { name: 'Disney+', cat: 'streaming' },
+  { name: 'Apple TV+', cat: 'streaming' }, { name: 'HBO Max', cat: 'streaming' },
+  { name: 'Amazon Prime Video', cat: 'streaming' }, { name: 'Hulu', cat: 'streaming' },
+  { name: 'Paramount+', cat: 'streaming' }, { name: 'Yes', cat: 'streaming' },
+  { name: 'HOT', cat: 'streaming' }, { name: 'Crunchyroll', cat: 'streaming' },
+  { name: 'YouTube Premium', cat: 'streaming' },
+  { name: 'Spotify', cat: 'music' }, { name: 'Apple Music', cat: 'music' },
+  { name: 'YouTube Music', cat: 'music' }, { name: 'Tidal', cat: 'music' },
+  { name: 'Deezer', cat: 'music' }, { name: 'Amazon Music', cat: 'music' },
+  { name: 'Audible', cat: 'music' }, { name: 'Pocket Casts', cat: 'music' },
+  { name: 'Google Drive', cat: 'cloud' }, { name: 'Google One', cat: 'cloud' },
+  { name: 'iCloud', cat: 'cloud' }, { name: 'Dropbox', cat: 'cloud' },
+  { name: 'OneDrive', cat: 'cloud' }, { name: 'AWS', cat: 'cloud' },
+  { name: 'Amazon Web Services', cat: 'cloud' }, { name: 'Google Cloud', cat: 'cloud' },
+  { name: 'Microsoft Azure', cat: 'cloud' }, { name: 'Backblaze', cat: 'cloud' },
+  { name: 'DigitalOcean', cat: 'cloud' }, { name: 'Heroku', cat: 'cloud' },
+  { name: 'Cloudflare', cat: 'cloud' }, { name: 'Vercel', cat: 'software' },
+  { name: 'Netlify', cat: 'software' }, { name: 'Vultr', cat: 'cloud' },
+  { name: 'Adobe Creative Cloud', cat: 'software' }, { name: 'Microsoft 365', cat: 'software' },
+  { name: 'Office 365', cat: 'software' }, { name: 'GitHub', cat: 'software' },
+  { name: 'GitHub Pro', cat: 'software' }, { name: 'Notion', cat: 'software' },
+  { name: 'Figma', cat: 'software' }, { name: 'Slack', cat: 'software' },
+  { name: 'Zoom', cat: 'software' }, { name: 'Canva', cat: 'software' },
+  { name: 'Trello', cat: 'software' }, { name: 'Asana', cat: 'software' },
+  { name: 'Jira', cat: 'software' }, { name: 'Linear', cat: 'software' },
+  { name: '1Password', cat: 'software' }, { name: 'NordVPN', cat: 'software' },
+  { name: 'ExpressVPN', cat: 'software' }, { name: 'Surfshark', cat: 'software' },
+  { name: 'Claude', cat: 'software' }, { name: 'ChatGPT', cat: 'software' },
+  { name: 'Copilot', cat: 'software' }, { name: 'Midjourney', cat: 'software' },
+  { name: 'Cursor', cat: 'software' }, { name: 'Webflow', cat: 'software' },
+  { name: 'Shopify', cat: 'software' }, { name: 'Grammarly', cat: 'software' },
+  { name: 'HubSpot', cat: 'software' }, { name: 'Salesforce', cat: 'software' },
+  { name: 'Xbox Game Pass', cat: 'gaming' }, { name: 'PlayStation Plus', cat: 'gaming' },
+  { name: 'Nintendo Switch Online', cat: 'gaming' }, { name: 'EA Play', cat: 'gaming' },
+  { name: 'Ubisoft+', cat: 'gaming' }, { name: 'Steam', cat: 'gaming' },
+  { name: 'New York Times', cat: 'news' }, { name: 'Haaretz', cat: 'news' },
+  { name: 'Calcalist', cat: 'news' }, { name: 'The Economist', cat: 'news' },
+  { name: 'Wall Street Journal', cat: 'news' }, { name: 'Medium', cat: 'news' },
+  { name: 'Substack', cat: 'news' },
+  { name: 'Peloton', cat: 'fitness' }, { name: 'Calm', cat: 'fitness' },
+  { name: 'Headspace', cat: 'fitness' }, { name: 'Strava', cat: 'fitness' },
+  { name: 'MyFitnessPal', cat: 'fitness' }, { name: 'Noom', cat: 'fitness' },
+  { name: 'Wolt', cat: 'food' }, { name: 'Tenbis', cat: 'food' }, { name: 'Ten Bis', cat: 'food' },
+  { name: 'Duolingo', cat: 'education' }, { name: 'Coursera', cat: 'education' },
+  { name: 'Udemy', cat: 'education' }, { name: 'LinkedIn Learning', cat: 'education' },
+  { name: 'Skillshare', cat: 'education' }, { name: 'MasterClass', cat: 'education' },
+  { name: 'Brilliant', cat: 'education' },
+];
+
+// ── MANAGE / CANCEL URLs ───────────────────────────────────
+const MANAGE_URLS = {
+  // Streaming
+  'netflix':               'https://www.netflix.com/cancelplan',
+  'disney+':               'https://www.disneyplus.com/account',
+  'disney plus':           'https://www.disneyplus.com/account',
+  'apple tv+':             'https://support.apple.com/en-us/118534',
+  'hbo max':               'https://www.max.com/account/manage-subscription',
+  'max':                   'https://www.max.com/account/manage-subscription',
+  'amazon prime video':    'https://www.amazon.com/mc/pipelines/cancellation',
+  'amazon prime':          'https://www.amazon.com/mc/pipelines/cancellation',
+  'hulu':                  'https://secure.hulu.com/account/cancel',
+  'paramount+':            'https://www.paramountplus.com/account/cancel-subscription/',
+  'crunchyroll':           'https://www.crunchyroll.com/account/membership',
+  'youtube premium':       'https://www.youtube.com/paid_memberships',
+  'yes':                   'https://www.yes.co.il/content/yesservice/account',
+  'hot':                   'https://www.hot.net.il/heb/personal/account/',
+  'peacock':               'https://www.peacocktv.com/account/cancel',
+  'starz':                 'https://www.starz.com/us/en/account',
+  'plex':                  'https://www.plex.tv/plex-pass/manage/',
+  // Music
+  'spotify':               'https://www.spotify.com/account/subscription/',
+  'apple music':           'https://support.apple.com/en-us/118534',
+  'youtube music':         'https://www.youtube.com/paid_memberships',
+  'tidal':                 'https://account.tidal.com/settings',
+  'deezer':                'https://www.deezer.com/account/subscription',
+  'amazon music':          'https://www.amazon.com/mc/pipelines/cancellation',
+  'audible':               'https://www.audible.com/account/cancel-membership',
+  'pocket casts':          'https://pocketcasts.com/account',
+  // Cloud
+  'google drive':          'https://one.google.com/storage',
+  'google one':            'https://one.google.com/storage',
+  'icloud':                'https://support.apple.com/en-us/118534',
+  'dropbox':               'https://www.dropbox.com/account/plan',
+  'onedrive':              'https://account.microsoft.com/services',
+  'aws':                   'https://console.aws.amazon.com/billing/home#/account',
+  'amazon web services':   'https://console.aws.amazon.com/billing/home#/account',
+  'google cloud':          'https://console.cloud.google.com/billing',
+  'microsoft azure':       'https://portal.azure.com/#blade/Microsoft_Azure_Billing',
+  'backblaze':             'https://secure.backblaze.com/user_overview.htm',
+  'digitalocean':          'https://cloud.digitalocean.com/account/billing',
+  'heroku':                'https://dashboard.heroku.com/account/billing',
+  'cloudflare':            'https://dash.cloudflare.com/?to=/:account/billing',
+  'vercel':                'https://vercel.com/account/billing',
+  'netlify':               'https://app.netlify.com/user/settings/billing',
+  'vultr':                 'https://my.vultr.com/billing/',
+  // Software / Tools
+  'adobe creative cloud':  'https://account.adobe.com/plans',
+  'adobe photoshop':       'https://account.adobe.com/plans',
+  'microsoft 365':         'https://account.microsoft.com/services',
+  'office 365':            'https://account.microsoft.com/services',
+  'github':                'https://github.com/settings/billing',
+  'github pro':            'https://github.com/settings/billing',
+  'notion':                'https://www.notion.so/my-account',
+  'figma':                 'https://www.figma.com/settings#plan',
+  'slack':                 'https://slack.com/account/billing',
+  'zoom':                  'https://zoom.us/account/billing',
+  'canva':                 'https://www.canva.com/settings/purchase-history',
+  'trello':                'https://trello.com/billing',
+  'asana':                 'https://app.asana.com/-/admin_console/billing',
+  'jira':                  'https://admin.atlassian.com/billing',
+  'linear':                'https://linear.app/settings/subscription',
+  '1password':             'https://my.1password.com/billing',
+  'lastpass':              'https://lastpass.com/my.php',
+  'nordvpn':               'https://my.nordaccount.com/subscription/',
+  'expressvpn':            'https://www.expressvpn.com/subscriptions',
+  'surfshark':             'https://account.surfshark.com/billing',
+  'claude':                'https://claude.ai/settings',
+  'chatgpt':               'https://chat.openai.com/account/billing',
+  'copilot':               'https://copilot.microsoft.com/account',
+  'midjourney':            'https://www.midjourney.com/account',
+  'cursor':                'https://www.cursor.com/settings',
+  'webflow':               'https://webflow.com/dashboard/billing',
+  'shopify':               'https://www.shopify.com/admin/settings/billing',
+  'mailchimp':             'https://admin.mailchimp.com/account/billing-history/',
+  'grammarly':             'https://account.grammarly.com/subscription',
+  'hubspot':               'https://app.hubspot.com/billing',
+  'salesforce':            'https://help.salesforce.com/s/articleView?id=000384781',
+  // Gaming
+  'xbox game pass':        'https://account.microsoft.com/services',
+  'playstation plus':      'https://www.playstation.com/acct/auto-deliver',
+  'nintendo switch online':'https://accounts.nintendo.com/profile/edit/memberships',
+  'ea play':               'https://www.ea.com/ea-play/cancel',
+  'ubisoft+':              'https://store.ubisoft.com/subscribe/cancel',
+  'steam':                 'https://store.steampowered.com/subscription/',
+  // News
+  'new york times':        'https://myaccount.nytimes.com/seg/subscription',
+  'haaretz':               'https://www.haaretz.co.il/personal-area/subscriptions',
+  'calcalist':             'https://www.calcalist.co.il/personal-area',
+  'the economist':         'https://myaccount.economist.com/s/manage-subscription',
+  'wall street journal':   'https://store.wsj.com/shop/wsjcom/cancel',
+  'medium':                'https://medium.com/me/membership',
+  'substack':              'https://substack.com/account/billing',
+  // Fitness
+  'peloton':               'https://members.onepeloton.com/profile/subscriptions',
+  'calm':                  'https://account.calm.com/',
+  'headspace':             'https://www.headspace.com/account/payment',
+  'strava':                'https://www.strava.com/settings/subscription',
+  'myfitnesspal':          'https://www.myfitnesspal.com/account/subscription',
+  'noom':                  'https://account.noom.com/settings/subscription',
+  // Food
+  'wolt':                  'https://wolt.com/en/me/subscriptions',
+  'tenbis':                'https://www.10bis.co.il/next/user-report',
+  'ten bis':               'https://www.10bis.co.il/next/user-report',
+  // Education
+  'duolingo':              'https://www.duolingo.com/settings/super',
+  'coursera':              'https://www.coursera.org/account-settings',
+  'udemy':                 'https://www.udemy.com/dashboard/',
+  'linkedin learning':     'https://www.linkedin.com/premium/manage',
+  'skillshare':            'https://www.skillshare.com/settings/membership',
+  'masterclass':           'https://www.masterclass.com/account/membership',
+  'brilliant':             'https://brilliant.org/account/',
+};
+
+function getManageUrl(name) {
+  const key = name.toLowerCase().trim();
+  // Exact match
+  if (MANAGE_URLS[key]) return MANAGE_URLS[key];
+  // Partial match
+  for (const k of Object.keys(MANAGE_URLS)) {
+    if (key.includes(k) || k.includes(key)) return MANAGE_URLS[k];
+  }
+  return null;
+}
+
+let expenses = [];
+let currUser = null;
+let currCode = 'ILS';
+let currSymbol = '₪';
+let exchangeRates = { ILS: 1, USD: 0.275, EUR: 0.252 };
+let activeFilter = 'all';
+let acSelected = -1;
+let aiCatTimeout = null;
+
+// ── AUTH ───────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('tab-login').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('tab-signup').style.display = tab === 'signup' ? '' : 'none';
+  document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='signup')));
+  clearAuthMessages();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-success').style.display = 'none';
+}
+function showAuthSuccess(msg) {
+  const el = document.getElementById('auth-success');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('auth-error').style.display = 'none';
+}
+function clearAuthMessages() {
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-success').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  if (!email || !password) { showAuthError('נא למלא אימייל וסיסמה'); return; }
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true; btn.textContent = 'מתחבר...';
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'כניסה למערכת';
+  if (error) showAuthError(error.message === 'Invalid login credentials' ? 'אימייל או סיסמה שגויים' : error.message);
+}
+
+async function doSignup() {
+  const email = document.getElementById('signup-email').value.trim();
+  const p1 = document.getElementById('signup-password').value;
+  const p2 = document.getElementById('signup-password2').value;
+  if (!email || !p1) { showAuthError('נא למלא את כל השדות'); return; }
+  if (p1 !== p2) { showAuthError('הסיסמאות אינן תואמות'); return; }
+  if (p1.length < 6) { showAuthError('סיסמה חייבת להיות לפחות 6 תווים'); return; }
+  const btn = document.getElementById('btn-signup');
+  btn.disabled = true; btn.textContent = 'יוצר חשבון...';
+  const { error } = await sb.auth.signUp({ email, password: p1 });
+  btn.disabled = false; btn.textContent = 'יצירת חשבון';
+  if (error) showAuthError(error.message);
+  else showAuthSuccess('✅ נשלח מייל אישור! בדוק את תיבת הדואר שלך.');
+}
+
+
+
+async function doLogout() {
+  await sb.auth.signOut();
+  expenses = [];
+  showAuth();
+}
+
+function showAuth() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+}
+
+function showApp(user) {
+  currUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  const email = user.email || '';
+  document.getElementById('user-email-display').textContent = email;
+  document.getElementById('user-avatar').textContent = email[0]?.toUpperCase() || '?';
+  fetchRates();
+  loadExpenses();
+}
+
+// ── SUPABASE DATA ──────────────────────────────────────────
+async function loadExpenses() {
+  const { data, error } = await sb.from('expenses')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) { console.error(error); return; }
+  expenses = (data || []).map(row => ({
+    id: row.id,
+    name: row.name,
+    amountILS: parseFloat(row.amount_ils),
+    origAmt: parseFloat(row.orig_amt || row.amount_ils),
+    origCurr: row.orig_curr || 'ILS',
+    freq: row.freq,
+    cat: row.category,
+    note: row.note || '',
+    manageUrl: row.manage_url || '',
+  }));
+  render();
+}
+
+async function saveExpense(exp) {
+  const { data, error } = await sb.from('expenses').insert({
+    user_id: currUser.id,
+    name: exp.name,
+    amount_ils: exp.amountILS,
+    orig_amt: exp.origAmt,
+    orig_curr: exp.origCurr,
+    freq: exp.freq,
+    category: exp.cat,
+    note: exp.note,
+    manage_url: exp.manageUrl,
+  }).select().single();
+  if (error) { console.error(error); return null; }
+  return data.id;
+}
+
+async function removeExpense(id) {
+  const { error } = await sb.from('expenses').delete().eq('id', id);
+  if (error) console.error(error);
+}
+
+// ── EXCHANGE RATES ─────────────────────────────────────────
+async function fetchRates() {
+  try {
+    const res = await fetch('https://api.frankfurter.app/latest?from=ILS&to=USD,EUR');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    exchangeRates = { ILS: 1, USD: data.rates.USD, EUR: data.rates.EUR };
+    const d = new Date(data.date).toLocaleDateString('he-IL');
+    document.getElementById('rate-info').innerHTML =
+      `שערי מטבע עדכניים: <span>1₪ = $${data.rates.USD.toFixed(4)} | 1₪ = €${data.rates.EUR.toFixed(4)}</span> · עודכן ${d}`;
+    render();
+  } catch {
+    document.getElementById('rate-info').innerHTML = `שערי מטבע <span>משוערים</span>`;
+    render();
+  }
+}
+
+const SYM = { ILS: '₪', USD: '$', EUR: '€' };
+function convertFromILS(ils) { return ils * exchangeRates[currCode]; }
+function convertToILS(amount, code) { return amount / exchangeRates[code]; }
+function fmt(ils) { const v = convertFromILS(ils); return SYM[currCode] + v.toFixed(v >= 100 ? 0 : 1); }
+
+function setCurrency(code, btn) {
+  currCode = code; currSymbol = SYM[code];
+  document.querySelectorAll('.curr-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('inp-curr-prefix').textContent = currSymbol;
+  render();
+}
+
+// ── AUTOCOMPLETE ───────────────────────────────────────────
+function onNameInput() {
+  const val = document.getElementById('inp-name').value.trim();
+  acSelected = -1; clearTimeout(aiCatTimeout);
+  if (!val) { hideAC(); clearBadge(); return; }
+  const matches = KNOWN_SERVICES.filter(s => s.name.toLowerCase().includes(val.toLowerCase())).slice(0, 7);
+  matches.length ? showAC(matches) : hideAC();
+  const knownMatch =
+    KNOWN_SERVICES.find(s => s.name.toLowerCase() === val.toLowerCase()) ||
+    KNOWN_SERVICES.find(s => s.name.toLowerCase().startsWith(val.toLowerCase())) ||
+    (matches.length === 1 ? matches[0] : null);
+  if (knownMatch) { autoSetCat(knownMatch.cat, 'known'); }
+  else if (val.length >= 3) { clearBadge(); aiCatTimeout = setTimeout(() => aiClassify(val), 700); }
+  else { clearBadge(); }
+}
+
+function showAC(matches) {
+  const list = document.getElementById('autocomplete-list');
+  list.style.display = 'block';
+  list.innerHTML = matches.map(s => {
+    const c = CATEGORIES[s.cat];
+    return `<div class="autocomplete-item" onclick="selectAC('${s.name.replace(/'/g,"\\'")}','${s.cat}')">${c.icon} ${s.name}<span class="autocomplete-cat">${c.label}</span></div>`;
+  }).join('');
+}
+function hideAC() { document.getElementById('autocomplete-list').style.display = 'none'; }
+function selectAC(name, cat) {
+  document.getElementById('inp-name').value = name;
+  hideAC(); clearTimeout(aiCatTimeout);
+  autoSetCat(cat, 'known');
+}
+function onNameKeydown(e) {
+  const list = document.getElementById('autocomplete-list');
+  if (list.style.display === 'none') return;
+  const items = list.querySelectorAll('.autocomplete-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); acSelected = Math.min(acSelected+1, items.length-1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acSelected = Math.max(acSelected-1, -1); }
+  else if (e.key === 'Enter' && acSelected >= 0) { e.preventDefault(); items[acSelected].click(); return; }
+  else if (e.key === 'Escape') { hideAC(); return; }
+  items.forEach((item, i) => item.classList.toggle('selected', i === acSelected));
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('autocomplete-wrapper').contains(e.target)) hideAC();
+});
+
+// ── AI CLASSIFY ────────────────────────────────────────────
+async function aiClassify(name) {
+  const badge = document.getElementById('auto-detect-badge');
+  badge.style.display = 'flex'; badge.className = 'auto-badge';
+  badge.innerHTML = `<span class="spinner"></span> מזהה קטגוריה...`;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514', max_tokens: 20,
+        system: `You are a subscription/service classifier. Return ONLY the single category key, no explanation, no punctuation.
+
+Categories:
+- streaming: video streaming, TV, movies (Netflix, Disney+, HBO, YouTube Premium, Apple TV+, Hulu, YES, HOT)
+- music: music, podcasts, audiobooks (Spotify, Apple Music, Tidal, Audible, Deezer)
+- cloud: cloud storage, file sync, hosting, servers, CDN, infrastructure (Dropbox, iCloud, Google Drive, OneDrive, Backblaze, Box, pCloud, AWS, Google Cloud, Azure, DigitalOcean, Heroku, Vultr, Cloudflare, Vercel, Netlify, Render)
+- software: apps, dev tools, AI tools, design, productivity, VPN, password managers (Adobe, Microsoft 365, GitHub, Notion, Figma, Slack, Zoom, Canva, 1Password, NordVPN, ChatGPT, Claude, Midjourney, Cursor, Shopify, Grammarly, Jira, Asana)
+- gaming: game subscriptions, passes (Xbox Game Pass, PlayStation Plus, Nintendo Online, EA Play, Steam)
+- news: news, journalism, newsletters (NYT, WSJ, Economist, Haaretz, Medium, Substack)
+- fitness: workout, meditation, health (Peloton, Calm, Headspace, Strava, MyFitnessPal)
+- food: food delivery, meal kits (Wolt, Tenbis, HelloFresh, DoorDash)
+- education: learning, courses, languages (Duolingo, Coursera, Udemy, Skillshare, MasterClass)
+- other: anything else`,
+        messages: [{ role: 'user', content: name }]
+      })
+    });
+    const data = await res.json();
+    const cat = data.content?.[0]?.text?.trim().toLowerCase().replace(/[^a-z]/g,'');
+    if (CATEGORIES[cat]) autoSetCat(cat, 'ai'); else clearBadge();
+  } catch { clearBadge(); }
+}
+
+function autoSetCat(cat, source) {
+  document.getElementById('inp-cat').value = cat;
+  const c = CATEGORIES[cat];
+  const badge = document.getElementById('auto-detect-badge');
+  badge.style.display = 'flex'; badge.className = 'auto-badge';
+  badge.innerHTML = source === 'ai'
+    ? `✨ זוהה ע"י AI: ${c.icon} <strong>${c.label}</strong>`
+    : `⚡ זוהה אוטומטית: ${c.icon} <strong>${c.label}</strong>`;
+}
+function clearBadge() { document.getElementById('auto-detect-badge').style.display = 'none'; }
+
+// ── ADD / DELETE ───────────────────────────────────────────
+async function addExpense() {
+  const name = document.getElementById('inp-name').value.trim();
+  const amtInCurr = parseFloat(document.getElementById('inp-amount').value);
+  const freq = document.getElementById('inp-freq').value;
+  const cat = document.getElementById('inp-cat').value;
+  const note = document.getElementById('inp-note').value.trim();
+  const manageUrl = document.getElementById('inp-url') ? document.getElementById('inp-url').value.trim() : '';
+  if (!name || isNaN(amtInCurr) || amtInCurr <= 0) {
+    const el = document.getElementById('inp-name');
+    el.style.borderColor = '#ff4444';
+    setTimeout(() => el.style.borderColor = '', 1500);
+    return;
+  }
+  const amountILS = convertToILS(amtInCurr, currCode);
+  const btn = document.getElementById('btn-add');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> שומר...';
+  const exp = { name, amountILS, origAmt: amtInCurr, origCurr: currCode, freq, cat, note, manageUrl };
+  const newId = await saveExpense(exp);
+  btn.disabled = false; btn.innerHTML = '+ הוסף הוצאה';
+  if (!newId) return;
+  exp.id = newId;
+  expenses.unshift(exp);
+  document.getElementById('inp-name').value = '';
+  document.getElementById('inp-amount').value = '';
+  document.getElementById('inp-note').value = '';
+  document.getElementById('inp-url').value = '';
+  clearBadge(); hideAC();
+  render();
+}
+
+async function deleteExpense(id) {
+  expenses = expenses.filter(e => e.id !== id);
+  render();
+  await removeExpense(id);
+}
+
+function setFilter(cat, btn) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+// ── HELPERS ────────────────────────────────────────────────
+function toMonthlyILS(e) {
+  const a = e.amountILS;
+  if (e.freq === 'yearly') return a / 12;
+  if (e.freq === 'weekly') return a * 4.33;
+  return a;
+}
+function freqLabel(f) { return { monthly: 'חודשי', yearly: 'שנתי', weekly: 'שבועי' }[f] || f; }
+
+// ── RENDER ─────────────────────────────────────────────────
+function render() { renderSummary(); renderList(); renderCategories(); renderFilterBar(); }
+
+function renderSummary() {
+  const total = expenses.reduce((s, e) => s + toMonthlyILS(e), 0);
+  document.getElementById('total-monthly').textContent = fmt(total);
+  document.getElementById('total-yearly').textContent = fmt(total * 12);
+  document.getElementById('total-count').textContent = expenses.length;
+  const catT = {};
+  expenses.forEach(e => { catT[e.cat] = (catT[e.cat]||0) + toMonthlyILS(e); });
+  const top = Object.entries(catT).sort((a,b) => b[1]-a[1])[0];
+  document.getElementById('top-category').textContent = top ? CATEGORIES[top[0]].icon : '—';
+}
+
+function renderFilterBar() {
+  const used = [...new Set(expenses.map(e => e.cat))];
+  const bar = document.getElementById('filter-bar');
+  bar.innerHTML = `<button class="filter-btn ${activeFilter==='all'?'active':''}" onclick="setFilter('all',this)">הכל</button>`;
+  used.forEach(cat => {
+    const c = CATEGORIES[cat];
+    bar.innerHTML += `<button class="filter-btn ${activeFilter===cat?'active':''}" onclick="setFilter('${cat}',this)">${c.icon} ${c.label}</button>`;
+  });
+}
+
+function renderList() {
+  const list = document.getElementById('expense-list');
+  const filtered = activeFilter === 'all' ? expenses : expenses.filter(e => e.cat === activeFilter);
+  if (!filtered.length) { list.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>אין הוצאות להצגה</div></div>`; return; }
+  list.innerHTML = filtered.map(e => {
+    const c = CATEGORIES[e.cat];
+    const monthly = toMonthlyILS(e);
+    const origSym = SYM[e.origCurr] || '₪';
+    const showOrig = e.origCurr && e.origCurr !== currCode && e.origAmt;
+    const manageUrl = getManageUrl(e.name);
+    const manageBtn = manageUrl
+      ? `<a class="btn-manage-sub" href="${manageUrl}" target="_blank" rel="noopener">🔧 רוצה לבטל / לשנות? לחץ כאן</a>`
+      : '';
+    return `<div class="expense-item">
+      <div class="expense-icon" style="background:${c.color}20">${c.icon}</div>
+      <div class="expense-info">
+        <div class="expense-name">${e.name}</div>
+        <div class="expense-meta">
+          <span class="cat-badge" style="background:${c.color}25;color:${c.color}">${c.label}</span>
+          · ${freqLabel(e.freq)}${e.note ? ' · '+e.note : ''}
+        </div>
+        ${manageBtn}
+      </div>
+      <div style="text-align:left;flex-shrink:0">
+        <div class="expense-amount" style="color:${c.color}">${fmt(e.amountILS)}</div>
+        ${showOrig ? `<div style="font-size:0.7rem;color:var(--muted)">${origSym}${e.origAmt.toFixed(0)} מקור</div>` : ''}
+        ${e.freq!=='monthly' ? `<div style="font-size:0.7rem;color:var(--muted)">${fmt(monthly)}/חודש</div>` : ''}
+      </div>
+      <button class="btn-icon" onclick="deleteExpense('${e.id}')" title="מחק">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function renderCategories() {
+  const catT = {};
+  expenses.forEach(e => { catT[e.cat] = (catT[e.cat]||0) + toMonthlyILS(e); });
+  const entries = Object.entries(catT).sort((a,b) => b[1]-a[1]);
+  const total = entries.reduce((s,[,v]) => s+v, 0);
+  const container = document.getElementById('cat-list');
+  if (!entries.length) { container.innerHTML = `<div class="empty-state"><div class="icon">📈</div><div>הוסף הוצאות לראות פירוט</div></div>`; return; }
+  container.innerHTML = entries.map(([cat, amount]) => {
+    const c = CATEGORIES[cat];
+    const pct = total > 0 ? amount/total*100 : 0;
+    const count = expenses.filter(e => e.cat === cat).length;
+    return `<div class="cat-row">
+      <div class="cat-row-header">
+        <div class="cat-name" style="color:${c.color}">${c.icon} ${c.label} <span style="color:var(--muted);font-size:0.75rem">(${count})</span></div>
+        <div class="cat-amount" style="color:${c.color}">${fmt(amount)}</div>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%;background:${c.color}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ── INIT ───────────────────────────────────────────────────
+async function init() {
+  // Listen for auth state changes
+  sb.auth.onAuthStateChange((event, session) => {
+    document.getElementById('loading-overlay').style.display = 'none';
+    if (session?.user) {
+      showApp(session.user);
+    } else {
+      showAuth();
+    }
+  });
+
+  // Check initial session
+  const { data: { session } } = await sb.auth.getSession();
+  document.getElementById('loading-overlay').style.display = 'none';
+  if (session?.user) {
+    showApp(session.user);
+  } else {
+    showAuth();
+  }
+}
+
+init();
+</script>
+</body>
+</html>
