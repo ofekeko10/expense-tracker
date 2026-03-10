@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ניתוח הוצאות | מעקב הוצאות</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#0a0a0f;--surface:#13131c;--surface2:#1c1c2e;--border:#2a2a40;--accent:#6c63ff;--text:#e8e8f0;--muted:#7070a0;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Heebo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:1.5rem 1rem;background-image:radial-gradient(ellipse at 20% 20%,#1a1040 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,#001a30 0%,transparent 50%);}
+.nav{max-width:1000px;margin:0 auto 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem;}
+.nav-logo{font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,#6c63ff,#00c6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.nav-links{display:flex;gap:.5rem;}
+.nav-btn{padding:.4rem 1rem;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Heebo',sans-serif;font-size:.85rem;cursor:pointer;text-decoration:none;transition:all .2s;}
+.nav-btn:hover,.nav-btn.active{background:var(--accent);border-color:var(--accent);color:white;}
+.nav-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#00c6ff);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;}
+.nav-user{display:flex;align-items:center;gap:.6rem;}
+.container{max-width:1000px;margin:0 auto;}
+.page-title{font-size:1.8rem;font-weight:900;margin-bottom:.3rem;background:linear-gradient(135deg,#6c63ff,#00c6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.page-sub{color:var(--muted);font-size:.88rem;margin-bottom:1.5rem;}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:1.5rem;margin-bottom:1.5rem;}
+.panel-title{font-size:1rem;font-weight:700;margin-bottom:1.2rem;display:flex;align-items:center;gap:.5rem;}
+.upload-zone{border:2px dashed var(--border);border-radius:16px;padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .25s;position:relative;}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:rgba(108,99,255,.06);}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:3.5rem;margin-bottom:1rem;}
+.upload-text{font-size:1.1rem;font-weight:700;margin-bottom:.4rem;}
+.upload-sub{font-size:.82rem;color:var(--muted);line-height:1.6;}
+.file-badge{display:inline-flex;align-items:center;gap:.5rem;margin-top:1rem;padding:.5rem 1rem;border-radius:10px;background:rgba(67,233,123,.12);border:1px solid rgba(67,233,123,.3);color:#43e97b;font-size:.85rem;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.1rem;text-align:center;}
+.sum-val{font-size:1.5rem;font-weight:900;background:linear-gradient(135deg,#6c63ff,#00c6ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.sum-label{font-size:.75rem;color:var(--muted);margin-top:.3rem;}
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem;}
+.cat-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem;cursor:pointer;transition:all .2s;}
+.cat-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 20px rgba(108,99,255,.15);}
+.cat-card.open{border-color:var(--accent);background:rgba(108,99,255,.08);}
+.cat-icon{font-size:1.8rem;margin-bottom:.5rem;}
+.cat-name{font-weight:700;font-size:.9rem;margin-bottom:.2rem;}
+.cat-stats{font-size:.75rem;color:var(--muted);}
+.cat-amount{font-size:1.1rem;font-weight:900;margin-top:.4rem;}
+.tx-section{background:var(--surface2);border:1px solid var(--accent);border-radius:14px;padding:1.2rem;margin-top:1rem;animation:fadeIn .25s;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.tx-section-title{font-weight:700;font-size:.95rem;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;}
+.close-btn{background:none;border:none;color:var(--muted);font-size:1.1rem;cursor:pointer;padding:.2rem .5rem;border-radius:6px;transition:all .2s;}
+.close-btn:hover{background:rgba(255,71,87,.15);color:#ff4757;}
+.biz-group{margin-bottom:.8rem;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.biz-header{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1rem;cursor:pointer;transition:background .15s;}
+.biz-header:hover{background:rgba(108,99,255,.08);}
+.biz-name{font-weight:600;font-size:.88rem;}
+.biz-summary{font-size:.75rem;color:var(--muted);}
+.biz-total{font-weight:800;font-size:.9rem;color:#a29bfe;}
+.biz-txs{border-top:1px solid var(--border);}
+.tx-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1fr auto;gap:.5rem;padding:.55rem 1rem;font-size:.78rem;border-bottom:1px solid rgba(42,42,64,.4);align-items:center;}
+.tx-row:last-child{border-bottom:none;}
+.tx-row:hover{background:rgba(108,99,255,.04);}
+.tx-head{background:rgba(42,42,64,.5);color:var(--muted);font-weight:600;font-size:.72rem;}
+.tx-amount-cell{font-weight:700;color:#ff6584;}
+.tx-badge{display:inline-block;padding:.1rem .4rem;border-radius:5px;font-size:.68rem;background:rgba(108,99,255,.15);color:#a29bfe;}
+.filter-row{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center;}
+.filter-btn{padding:.3rem .8rem;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'Heebo',sans-serif;font-size:.8rem;cursor:pointer;transition:all .2s;}
+.filter-btn:hover,.filter-btn.active{background:var(--accent);border-color:var(--accent);color:white;}
+.search-input{padding:.4rem .9rem;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:'Heebo',sans-serif;font-size:.82rem;outline:none;width:200px;}
+.search-input:focus{border-color:var(--accent);}
+.col-map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.8rem;margin-bottom:1.2rem;}
+.col-map-grid select{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .9rem;color:var(--text);font-family:'Heebo',sans-serif;font-size:.85rem;outline:none;width:100%;transition:border-color .2s;}
+.col-map-grid select:focus{border-color:var(--accent);}
+.col-map-grid label{font-size:.78rem;color:var(--muted);margin-bottom:.3rem;display:block;}
+.spinner{width:16px;height:16px;border:2px solid rgba(162,155,254,.3);border-top-color:#a29bfe;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:1rem;}
+#loading-overlay .spinner{width:36px;height:36px;border-width:3px;}
+#loading-overlay p{color:var(--muted);}
+.btn-primary{padding:.75rem 1.5rem;background:linear-gradient(135deg,var(--accent),#a06cff);border:none;border-radius:12px;color:white;font-family:'Heebo',sans-serif;font-weight:700;font-size:.95rem;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem;transition:opacity .2s;}
+.btn-primary:hover{opacity:.9;}
+.btn-sec{padding:.6rem 1.1rem;background:transparent;border:1px solid var(--border);border-radius:10px;color:var(--muted);font-family:'Heebo',sans-serif;font-size:.88rem;cursor:pointer;transition:all .2s;}
+.btn-sec:hover{border-color:var(--accent);color:var(--text);}
+</style>
+</head>
+<body>
+
+<div id="loading-overlay"><span class="spinner"></span><p>טוען...</p></div>
+
+<div id="main" style="display:none">
+  <nav class="nav">
+    <div class="nav-logo">💸 מעקב הוצאות</div>
+    <div class="nav-links">
+      <a href="index.html" class="nav-btn">🏠 מינויים</a>
+      <a href="import.html" class="nav-btn active">📊 ניתוח הוצאות</a>
+    </div>
+    <div class="nav-user">
+      <div class="nav-avatar" id="nav-avatar">?</div>
+      <button class="nav-btn" onclick="doLogout()">יציאה</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="page-title">📊 ניתוח הוצאות מקובץ</div>
+    <p class="page-sub">העלה קובץ Excel או CSV מכרטיס האשראי — הקטגוריות נלקחות ישירות מהקובץ</p>
+
+    <!-- UPLOAD -->
+    <div class="panel">
+      <div class="panel-title">📤 העלאת קובץ</div>
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".xlsx,.xls,.csv" onchange="onFileSelected(event)">
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">גרור קובץ לכאן או לחץ לבחירה</div>
+        <div class="upload-sub">תומך ב-Excel (.xlsx, .xls) ו-CSV<br>פורמטים: ישראכארט, ויזה, מסטרקארד, max, לאומי, פועלים ועוד</div>
+      </div>
+      <div id="file-badge" style="display:none" class="file-badge"></div>
+    </div>
+
+    <!-- COLUMN MAPPING -->
+    <div class="panel" id="panel-cols" style="display:none">
+      <div class="panel-title">🗂️ מיפוי עמודות</div>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem">המערכת זיהתה את העמודות אוטומטית — בדוק ותקן לפי הצורך</p>
+      <div class="col-map-grid" id="col-map-grid"></div>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap">
+        <button class="btn-primary" onclick="analyzeFile()">📊 נתח הוצאות</button>
+        <button class="btn-sec" onclick="resetAll()">↩ קובץ אחר</button>
+      </div>
+    </div>
+
+    <!-- RESULTS -->
+    <div id="panel-results" style="display:none">
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="panel" style="padding:1rem 1.5rem">
+        <div class="filter-row" id="filter-row">
+          <input type="text" class="search-input" id="search-input" placeholder="🔍 חיפוש בית עסק..." oninput="applyFilters()">
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📂 הוצאות לפי קטגוריה — לחץ לפירוט</div>
+        <div class="cat-grid" id="cat-grid"></div>
+        <div id="tx-section" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL  = 'https://rwprihpuwwsmbajsogdm.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3cHJpaHB1d3dzbWJhanNvZ2RtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODY0MjksImV4cCI6MjA4Nzg2MjQyOX0.SX40sER3520nW-K_ybXoYfpBk1ElYRixxXR0FxeLDfo';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+const FIELDS = [
+  { id:'f_date',      label:'תאריך עסקה',             hints:['תאריך עסקה','תאריך','date'] },
+  { id:'f_biz',       label:'שם בית העסק',            hints:['שם בית','בית עסק','שם','מוסד','תיאור'] },
+  { id:'f_cat',       label:'קטגוריה',                hints:['קטגוריה','category','סוג הוצאה'] },
+  { id:'f_last4',     label:'4 ספרות אחרונות',        hints:['4 ספרות','ספרות','כרטיס','card'] },
+  { id:'f_txtype',    label:'אופן ביצוע / סוג עסקה', hints:['אופן','סוג עסקה','סוג'] },
+  { id:'f_amount',    label:'סכום חיוב (₪)',          hints:['סכום חיוב','חיוב','סכום בש','amount'] },
+  { id:'f_currency',  label:'מטבע חיוב',             hints:['מטבע חיוב','מטבע'] },
+  { id:'f_orig_amt',  label:'סכום עסקה מקורי',       hints:['מקורי','סכום עסקה','עסקה מקורית'] },
+  { id:'f_charge_dt', label:'תאריך חיוב',            hints:['תאריך חיוב'] },
+  { id:'f_notes',     label:'הערות',                 hints:['הערות','הערה','notes'] },
+];
+
+const CAT_ICONS = {'מזון':'🍽️','מסעדה':'🍽️','סופר':'🛒','תחבורה':'🚗','קניות':'🛍️','בריאות':'💊','רפואה':'💊','טכנולוגיה':'💻','בילוי':'🎭','חשבונות':'📋','נסיעות':'✈️','חינוך':'📚','ביגוד':'👗','בית':'🏠','יופי':'💅','ביטוח':'🛡️','תקשורת':'📱','דלק':'⛽','פיננסים':'💰','אחר':'📦'};
+const CAT_COLORS = ['#e17055','#00b894','#fdcb6e','#fd79a8','#55efc4','#6c63ff','#a29bfe','#74b9ff','#00c6ff','#ffeaa7','#fab1a0','#81ecec','#e84393','#55efc4','#636e72','#b2bec3'];
+const catColorMap = {};
+let colorIdx = 0;
+function getCatStyle(cat) {
+  if (!catColorMap[cat]) catColorMap[cat] = CAT_COLORS[colorIdx++ % CAT_COLORS.length];
+  const icon = Object.entries(CAT_ICONS).find(([k]) => (cat||'').includes(k));
+  return { color: catColorMap[cat], icon: icon ? icon[1] : '📦' };
+}
+
+let headers = [], allRows = [], activeFilter = 'all', openCat = null, cachedRows = [];
+
+async function init() {
+  const { data:{ session } } = await sb.auth.getSession();
+  document.getElementById('loading-overlay').style.display = 'none';
+  if (!session?.user) { window.location.href = 'index.html'; return; }
+  document.getElementById('nav-avatar').textContent = (session.user.email||'?')[0].toUpperCase();
+  document.getElementById('main').style.display = 'block';
+}
+async function doLogout() { await sb.auth.signOut(); window.location.href = 'index.html'; }
+
+const zone = document.getElementById('upload-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+function onFileSelected(e) { if (e.target.files[0]) readFile(e.target.files[0]); }
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    let rows = [];
+    try {
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        let text = new TextDecoder('utf-8').decode(ev.target.result);
+        if (text.includes('\uFFFD')) text = new TextDecoder('windows-1255').decode(ev.target.result);
+        rows = text.split('\n').map(l => l.split(',').map(c => c.trim().replace(/^"|"$/g,''))).filter(r => r.some(c => c));
+      } else {
+        const wb = XLSX.read(ev.target.result, { type:'array', codepage:65001 });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
+      }
+    } catch(err) { alert('שגיאה בקריאת הקובץ: ' + err.message); return; }
+    if (rows.length < 2) { alert('הקובץ ריק או לא נתמך'); return; }
+
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      if (rows[i].filter(c => String(c).trim()).length > 3) { headerIdx = i; break; }
+    }
+    headers = rows[headerIdx].map(h => String(h).trim());
+    allRows  = rows.slice(headerIdx + 1).filter(r => r.some(c => String(c).trim()));
+
+    const badge = document.getElementById('file-badge');
+    badge.style.display = 'inline-flex';
+    badge.textContent = `✅ ${file.name} · ${allRows.length} שורות`;
+    buildColMap();
+    document.getElementById('panel-cols').style.display = 'block';
+    document.getElementById('panel-cols').scrollIntoView({ behavior:'smooth' });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildColMap() {
+  const grid = document.getElementById('col-map-grid');
+  grid.innerHTML = FIELDS.map(f => {
+    const best = autoDetect(f.hints);
+    const noneOpt = `<option value="-1">— לא רלוונטי —</option>`;
+    const opts = headers.map((h,i) => `<option value="${i}" ${i===best?'selected':''}>${h||'עמודה '+(i+1)}</option>`).join('');
+    return `<div><label>${f.label}</label><select id="${f.id}">${noneOpt}${opts}</select></div>`;
+  }).join('');
+}
+function autoDetect(hints) {
+  for (const hint of hints) {
+    const idx = headers.findIndex(h => String(h).toLowerCase().includes(hint.toLowerCase()));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+function getCol(id) { const s = document.getElementById(id); return s ? parseInt(s.value) : -1; }
+
+function analyzeFile() {
+  const bizCol = getCol('f_biz'), amtCol = getCol('f_amount');
+  if (bizCol===-1 || amtCol===-1) { alert('חובה למפות עמודת שם בית עסק וסכום חיוב'); return; }
+  const dateCol=getCol('f_date'), catCol=getCol('f_cat'), last4Col=getCol('f_last4');
+  const txtypeCol=getCol('f_txtype'), currCol=getCol('f_currency'), origAmtCol=getCol('f_orig_amt');
+  const chargeDtCol=getCol('f_charge_dt'), notesCol=getCol('f_notes');
+
+  cachedRows = allRows.map(r => {
+    const rawAmt = String(r[amtCol]||'').replace(/[^\d.\-]/g,'');
+    const amount = parseFloat(rawAmt);
+    return {
+      biz:       String(r[bizCol]||'').trim(),
+      cat:       catCol>=0 ? String(r[catCol]||'אחר').trim() : 'אחר',
+      amount:    isNaN(amount) ? 0 : Math.abs(amount),
+      date:      dateCol>=0   ? String(r[dateCol]||'').trim() : '',
+      last4:     last4Col>=0  ? String(r[last4Col]||'').trim() : '',
+      txtype:    txtypeCol>=0 ? String(r[txtypeCol]||'').trim() : '',
+      currency:  currCol>=0   ? String(r[currCol]||'').trim() : '',
+      origAmt:   origAmtCol>=0? String(r[origAmtCol]||'').trim() : '',
+      chargeDate:chargeDtCol>=0? String(r[chargeDtCol]||'').trim() : '',
+      notes:     notesCol>=0  ? String(r[notesCol]||'').trim() : '',
+    };
+  }).filter(r => r.biz && r.amount > 0);
+
+  if (!cachedRows.length) { alert('לא נמצאו שורות תקינות'); return; }
+
+  document.getElementById('panel-results').style.display = 'block';
+  buildFilterBar(cachedRows);
+  renderResults(cachedRows);
+  document.getElementById('panel-results').scrollIntoView({ behavior:'smooth' });
+}
+
+function renderResults(rows) {
+  const total = rows.reduce((s,r) => s+r.amount, 0);
+  const cats  = [...new Set(rows.map(r => r.cat))];
+  const catTotals = rows.reduce((m,r) => { m[r.cat]=(m[r.cat]||0)+r.amount; return m; }, {});
+  const topCat = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('summary-grid').innerHTML = [
+    { val:'₪'+total.toLocaleString('he-IL',{maximumFractionDigits:0}), label:'סה"כ הוצאות' },
+    { val:rows.length, label:'עסקאות' },
+    { val:cats.length, label:'קטגוריות' },
+    { val: topCat ? getCatStyle(topCat[0]).icon+' '+topCat[0] : '—', label:'קטגוריה יקרה' },
+  ].map(c=>`<div class="sum-card"><div class="sum-val">${c.val}</div><div class="sum-label">${c.label}</div></div>`).join('');
+  renderCats(rows);
+}
+
+function renderCats(rows) {
+  const catTotals={}, catRows={};
+  rows.forEach(r => {
+    catTotals[r.cat]=(catTotals[r.cat]||0)+r.amount;
+    if(!catRows[r.cat]) catRows[r.cat]=[];
+    catRows[r.cat].push(r);
+  });
+  document.getElementById('cat-grid').innerHTML = Object.entries(catTotals)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([cat,amt]) => {
+      const s = getCatStyle(cat);
+      return `<div class="cat-card ${openCat===cat?'open':''}" onclick='toggleCat(${JSON.stringify(cat)},${JSON.stringify(catRows[cat])})'>
+        <div class="cat-icon">${s.icon}</div>
+        <div class="cat-name" style="color:${s.color}">${cat}</div>
+        <div class="cat-stats">${catRows[cat].length} עסקאות</div>
+        <div class="cat-amount" style="color:${s.color}">₪${amt.toLocaleString('he-IL',{maximumFractionDigits:0})}</div>
+      </div>`;
+    }).join('');
+}
+
+function toggleCat(cat, rows) {
+  const sec = document.getElementById('tx-section');
+  if (openCat === cat) { sec.style.display='none'; openCat=null; applyFilters(); return; }
+  openCat = cat; applyFilters();
+  sec.style.display = 'block';
+  renderTxSection(cat, rows, sec);
+  setTimeout(() => sec.scrollIntoView({ behavior:'smooth', block:'nearest' }), 50);
+}
+
+function renderTxSection(cat, rows, container) {
+  const s = getCatStyle(cat);
+  const total = rows.reduce((sum,r)=>sum+r.amount,0);
+  const bizMap = {};
+  rows.forEach(r => {
+    if(!bizMap[r.biz]) bizMap[r.biz]={total:0,txs:[]};
+    bizMap[r.biz].total+=r.amount; bizMap[r.biz].txs.push(r);
+  });
+  container.innerHTML = `<div class="tx-section">
+    <div class="tx-section-title">
+      <span>${s.icon} ${cat} &nbsp;·&nbsp; ₪${total.toLocaleString('he-IL',{maximumFractionDigits:0})} &nbsp;·&nbsp; ${rows.length} עסקאות</span>
+      <button class="close-btn" onclick='toggleCat(${JSON.stringify(cat)},null)'>✕ סגור</button>
+    </div>
+    ${Object.entries(bizMap).sort((a,b)=>b[1].total-a[1].total).map(([biz,data])=>`
+      <div class="biz-group">
+        <div class="biz-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+          <div><div class="biz-name">${biz}</div><div class="biz-summary">${data.txs.length} עסקאות · לחץ לפירוט</div></div>
+          <div class="biz-total">₪${data.total.toLocaleString('he-IL',{maximumFractionDigits:0})}</div>
+        </div>
+        <div class="biz-txs" style="display:none">
+          <div class="tx-row tx-head"><div>תאריך עסקה</div><div>סכום חיוב</div><div>מטבע / מקורי</div><div>אופן ביצוע</div><div>4 ספרות</div><div>הערות</div></div>
+          ${data.txs.sort((a,b)=>a.date>b.date?-1:1).map(t=>`
+            <div class="tx-row">
+              <div>${t.date||'—'}</div>
+              <div class="tx-amount-cell">₪${t.amount.toLocaleString('he-IL',{maximumFractionDigits:2})}</div>
+              <div>${t.currency||''} ${t.origAmt?'('+t.origAmt+')':''}</div>
+              <div><span class="tx-badge">${t.txtype||'—'}</span></div>
+              <div style="color:var(--muted)">${t.last4?'****'+t.last4:'—'}</div>
+              <div style="color:var(--muted);font-size:.7rem">${t.notes||''}</div>
+            </div>`).join('')}
+        </div>
+      </div>`).join('')}
+  </div>`;
+}
+
+function buildFilterBar(rows) {
+  const cats = [...new Set(rows.map(r=>r.cat))].sort();
+  const bar = document.getElementById('filter-row');
+  bar.querySelectorAll('.filter-btn').forEach(b=>b.remove());
+  bar._rows = rows;
+  bar.insertAdjacentHTML('beforeend',
+    `<button class="filter-btn active" onclick="setFilter('all',this)">הכל</button>` +
+    cats.map(c=>`<button class="filter-btn" onclick="setFilter(${JSON.stringify(c)},this)">${getCatStyle(c).icon} ${c}</button>`).join('')
+  );
+}
+
+function setFilter(cat, btn) {
+  activeFilter=cat; openCat=null;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tx-section').style.display='none';
+  applyFilters();
+}
+
+function applyFilters() {
+  const bar = document.getElementById('filter-row');
+  const rows = bar._rows; if(!rows) return;
+  const search = (document.getElementById('search-input').value||'').toLowerCase();
+  const filtered = rows.filter(r =>
+    (activeFilter==='all' || r.cat===activeFilter) &&
+    (!search || r.biz.toLowerCase().includes(search))
+  );
+  const total = filtered.reduce((s,r)=>s+r.amount,0);
+  const vals = document.getElementById('summary-grid').querySelectorAll('.sum-val');
+  if(vals[0]) vals[0].textContent = '₪'+total.toLocaleString('he-IL',{maximumFractionDigits:0});
+  if(vals[1]) vals[1].textContent = filtered.length;
+  renderCats(filtered);
+}
+
+function resetAll() {
+  document.getElementById('file-input').value='';
+  document.getElementById('file-badge').style.display='none';
+  document.getElementById('panel-cols').style.display='none';
+  document.getElementById('panel-results').style.display='none';
+  headers=[]; allRows=[]; openCat=null; activeFilter='all'; cachedRows=[];
+}
+
+init();
+</script>
+</body>
+</html>
